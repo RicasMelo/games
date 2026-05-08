@@ -178,6 +178,7 @@
             <div id="revealPrompt" class="card black-card"></div>
             <div id="revealResponse"></div>
             <div id="winnerButtons" class="cards"></div>
+            <button id="nextRevealBtn" class="hidden">Show Next Response</button>
         </div>
 
         <div id="winnerSection" class="hidden">
@@ -267,6 +268,7 @@
         const revealPrompt = document.getElementById("revealPrompt");
         const revealResponse = document.getElementById("revealResponse");
         const winnerButtons = document.getElementById("winnerButtons");
+        const nextRevealBtn = document.getElementById("nextRevealBtn");
 
         const winnerText = document.getElementById("winnerText");
         const playAgainBtn = document.getElementById("playAgainBtn");
@@ -367,6 +369,10 @@
             if (!state) {
                 chooserSection.classList.remove("hidden");
                 return;
+            }
+
+            if (state.phase === "waiting") {
+                chooserSection.classList.remove("hidden");
             }
 
             if (state.phase === "choosingPrompt") {
@@ -485,8 +491,14 @@
             const allReady = responsePlayers.every(player => player.ready === true);
 
             if (allReady) {
+                const submissionsSnap = await get(ref(db, `${GAME_ID}/Submissions`));
+                const submissions = submissionsSnap.val() || {};
+                const submissionList = Object.values(submissions);
+
                 await update(ref(db, `${GAME_ID}/State`), {
-                    phase: "revealing"
+                    phase: "revealing",
+                    revealIndex: 0,
+                    revealTotal: submissionList.length
                 });
             }
         }
@@ -495,55 +507,69 @@
             revealSection.classList.remove("hidden");
             revealPrompt.textContent = state.prompt;
 
-            if (!revealStarted) {
-                revealStarted = true;
-                await revealSubmissions();
-            }
-        }
-
-        async function revealSubmissions() {
             const submissionsSnap = await get(ref(db, `${GAME_ID}/Submissions`));
             const submissions = submissionsSnap.val() || {};
             const submissionList = Object.values(submissions);
 
-            revealResponse.innerHTML = "";
+            winnerButtons.innerHTML = "";
 
-            for (const submission of submissionList) {
+            const currentIndex = state.revealIndex || 0;
+            const currentSubmission = submissionList[currentIndex];
+
+            if (!currentSubmission) {
                 revealResponse.innerHTML = `
-          <div class="reveal-card">
-            <small>${submission.username}</small>
-            <br><br>
-            ${submission.response}
-          </div>
-        `;
+      <div class="reveal-card">
+        All responses revealed.
+      </div>
+    `;
 
-                await wait(10000);
+                nextRevealBtn.classList.add("hidden");
+
+                if (state.promptChooser === username) {
+                    showWinnerButtons(submissionList);
+                }
+
+                return;
             }
 
             revealResponse.innerHTML = `
-        <div class="reveal-card">
-          All responses revealed.
-        </div>
-      `;
-
-            const stateSnap = await get(ref(db, `${GAME_ID}/State`));
-            const state = stateSnap.val();
+    <div class="reveal-card">
+      <small>${currentSubmission.username}</small>
+      <br><br>
+      ${currentSubmission.response}
+    </div>
+  `;
 
             if (state.promptChooser === username) {
-                showWinnerButtons(submissionList);
+                nextRevealBtn.classList.remove("hidden");
+            } else {
+                nextRevealBtn.classList.add("hidden");
             }
+
+            nextRevealBtn.onclick = async () => {
+                const nextIndex = currentIndex + 1;
+
+                await update(ref(db, `${GAME_ID}/State`), {
+                    revealIndex: nextIndex
+                });
+            };
         }
 
         function showWinnerButtons(submissionList) {
             winnerButtons.innerHTML = "";
+            nextRevealBtn.classList.add("hidden");
 
             submissionList.forEach(submission => {
                 const btn = document.createElement("button");
                 btn.textContent = `Choose ${submission.username}`;
 
                 btn.addEventListener("click", async () => {
+                    const playerSnap = await get(ref(db, `${GAME_ID}/Players/${submission.username}`));
+                    const player = playerSnap.val() || {};
+                    const currentScore = player.score || 0;
+
                     await update(ref(db, `${GAME_ID}/Players/${submission.username}`), {
-                        score: 1
+                        score: currentScore + 1
                     });
 
                     await update(ref(db, `${GAME_ID}/State`), {
@@ -568,21 +594,34 @@
         }
 
         playAgainBtn.addEventListener("click", async () => {
-            const savedUsername = localStorage.getItem("username");
+            const playersSnap = await get(ref(db, `${GAME_ID}/Players`));
+            const oldPlayers = playersSnap.val() || {};
+
+            const playerNames = Object.keys(oldPlayers);
 
             await remove(ref(db, GAME_ID));
 
-            if (savedUsername) {
-                await set(ref(db, `${GAME_ID}/Players/${savedUsername}`), {
-                    username: savedUsername,
+            for (const playerName of playerNames) {
+                const oldPlayer = oldPlayers[playerName];
+
+                await set(ref(db, `${GAME_ID}/Players/${playerName}`), {
+                    username: playerName,
                     ready: false,
-                    score: 0,
+                    score: oldPlayer.score || 0,
                     vote: 0,
                     role: "waiting"
                 });
             }
 
             revealStarted = false;
+
+            await update(ref(db, `${GAME_ID}/State`), {
+                phase: "waiting",
+                promptChooser: "",
+                prompt: "",
+                winner: "",
+                revealIndex: 0
+            });
         });
 
         function wait(ms) {
