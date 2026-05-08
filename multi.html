@@ -4,18 +4,96 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Register Player</title>
+    <title>Player Registration</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #141e30, #243b55);
+            color: white;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            width: 350px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            margin-bottom: 25px;
+            font-size: 28px;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: #00c6ff;
+            background: linear-gradient(to right, #0072ff, #00c6ff);
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+        button:hover {
+            transform: scale(1.03);
+            opacity: 0.95;
+        }
+
+        #message {
+            margin-top: 20px;
+            min-height: 24px;
+            font-size: 14px;
+            color: #ffd369;
+        }
+    </style>
 </head>
 
 <body>
-    <h1>Select your username:</h1>
 
-    <input id="usernameInput" type="text" placeholder="Username" />
-    <button id="submitBtn">Submit</button>
+    <div class="container">
+        <h1>Select your username</h1>
 
-    <p id="message"></p>
+        <input id="usernameInput" type="text" placeholder="Enter username" maxlength="20" />
+
+        <button id="submitBtn">Join Game</button>
+
+        <p id="message"></p>
+    </div>
 
     <script type="module">
+
+        // IMPORTANT:
+        // Use these FULL URL imports
+        // NOT "firebase/app"
+
         import { initializeApp } from "firebase/app";
         import {
             getDatabase,
@@ -36,19 +114,25 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
+        // ELEMENTS
         const usernameInput = document.getElementById("usernameInput");
         const submitBtn = document.getElementById("submitBtn");
         const message = document.getElementById("message");
 
+
+        // REGISTER PLAYER
         submitBtn.addEventListener("click", async () => {
+
             const username = usernameInput.value.trim();
 
             if (username.length < 3) {
-                message.textContent = "Username must be at least 3 characters long.";
+                message.textContent =
+                    "Username must contain at least 3 characters.";
                 return;
             }
 
             try {
+
                 await set(ref(db, "Players/" + username), {
                     username: username,
                     ready: false,
@@ -56,14 +140,23 @@
                     vote: 0
                 });
 
-                message.textContent = "Player registered successfully.";
+                message.textContent =
+                    "Player registered successfully.";
+
                 usernameInput.value = "";
+
             } catch (error) {
+
                 console.error(error);
-                message.textContent = "Error registering player.";
+
+                message.textContent =
+                    "Error while registering player.";
             }
+
         });
+
     </script>
+
 </body>
 
 </html>
