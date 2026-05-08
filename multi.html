@@ -73,6 +73,80 @@
             font-size: 14px;
             color: #ffd369;
         }
+
+        .hidden {
+            display: none;
+        }
+
+        .game-box {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 700px;
+            text-align: center;
+        }
+
+        #promptCards,
+        #responseCards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-top: 25px;
+        }
+
+        .card {
+            min-height: 140px;
+            padding: 22px;
+            border-radius: 18px;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: 0.2s ease;
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.25);
+        }
+
+        .prompt-card {
+            background: #111;
+            color: white;
+        }
+
+        .response-card {
+            background: white;
+            color: #111;
+        }
+
+        .card:hover {
+            transform: translateY(-6px) scale(1.02);
+        }
+
+        #revealResponse {
+            margin-top: 35px;
+            background: white;
+            color: #111;
+            border-radius: 22px;
+            padding: 35px;
+            font-size: 28px;
+            font-weight: bold;
+            min-height: 180px;
+            opacity: 0;
+            transform: scale(0.92);
+            transition: 0.5s ease;
+        }
+
+        #revealResponse.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .player-label {
+            font-size: 16px;
+            color: #777;
+            margin-bottom: 15px;
+        }
+
+        #bePromptChooserBtn {
+            margin-top: 25px;
+        }
     </style>
 </head>
 
@@ -86,6 +160,35 @@
         <button id="submitBtn">Join Game</button>
 
         <p id="message"></p>
+    </div>
+
+    <!-- Add this inside your body -->
+    <div class="game-box">
+        <h2 id="playerNameDisplay"></h2>
+
+        <div id="chooserSection">
+            <button id="bePromptChooserBtn">Become Prompt Chooser</button>
+        </div>
+
+        <div id="promptChooserSection" class="hidden">
+            <h2>Choose a prompt</h2>
+            <div id="promptCards"></div>
+        </div>
+
+        <div id="responseChooserSection" class="hidden">
+            <h2 id="activePrompt"></h2>
+            <h3>Choose your response</h3>
+            <div id="responseCards"></div>
+        </div>
+
+        <div id="waitingSection" class="hidden">
+            <h2>Waiting for other players...</h2>
+        </div>
+
+        <div id="revealSection" class="hidden">
+            <h2 id="revealPrompt"></h2>
+            <div id="revealResponse"></div>
+        </div>
     </div>
 
     <script type="module">
@@ -122,7 +225,45 @@
         const submitBtn = document.getElementById("submitBtn");
         const message = document.getElementById("message");
         const GAME_ID = "Game1"; // Change this whenever needed
+        const username = localStorage.getItem("username");
+        const playerNameDisplay = document.getElementById("playerNameDisplay");
+        const bePromptChooserBtn = document.getElementById("bePromptChooserBtn");
 
+        const chooserSection = document.getElementById("chooserSection");
+        const promptChooserSection = document.getElementById("promptChooserSection");
+        const responseChooserSection = document.getElementById("responseChooserSection");
+        const waitingSection = document.getElementById("waitingSection");
+        const revealSection = document.getElementById("revealSection");
+
+        const promptCards = document.getElementById("promptCards");
+        const responseCards = document.getElementById("responseCards");
+        const activePrompt = document.getElementById("activePrompt");
+        const revealPrompt = document.getElementById("revealPrompt");
+        const revealResponse = document.getElementById("revealResponse");
+
+        playerNameDisplay.textContent = `Player: ${username}`;
+
+        const prompts = [
+            "Why can't I sleep at night?",
+            "What ended my last relationship?",
+            "What's that smell?",
+            "What is Batman's guilty pleasure?",
+            "What never fails to liven up the party?",
+            "What's my secret power?"
+        ];
+
+        const responses = [
+            "A suspicious amount of cheese.",
+            "The entire Portuguese tax system.",
+            "A very confused pigeon.",
+            "Grandma's forbidden soup.",
+            "An unpaid internship.",
+            "A dramatic entrance.",
+            "Too much confidence.",
+            "A PowerPoint presentation nobody asked for.",
+            "One aggressively medium potato.",
+            "A surprisingly emotional toaster."
+        ];
 
         // REGISTER PLAYER
         submitBtn.addEventListener("click", async () => {
@@ -157,6 +298,201 @@
             }
 
         });
+
+        function hideAllSections() {
+            chooserSection.classList.add("hidden");
+            promptChooserSection.classList.add("hidden");
+            responseChooserSection.classList.add("hidden");
+            waitingSection.classList.add("hidden");
+            revealSection.classList.add("hidden");
+        }
+
+        function drawRandomCards(array, amount) {
+            return [...array].sort(() => Math.random() - 0.5).slice(0, amount);
+        }
+
+        bePromptChooserBtn.addEventListener("click", async () => {
+            await update(ref(db, `${GAME_ID}/State`), {
+                phase: "choosingPrompt",
+                promptChooser: username,
+                prompt: ""
+            });
+
+            await update(ref(db, `${GAME_ID}/Players/${username}`), {
+                role: "promptChooser",
+                ready: true
+            });
+
+            const playersSnapshot = await get(ref(db, `${GAME_ID}/Players`));
+            const players = playersSnapshot.val() || {};
+
+            for (const player in players) {
+                if (player !== username) {
+                    await update(ref(db, `${GAME_ID}/Players/${player}`), {
+                        role: "responseChooser",
+                        ready: false
+                    });
+                }
+            }
+
+            await remove(ref(db, `${GAME_ID}/Submissions`));
+        });
+
+        onValue(ref(db, `${GAME_ID}/State`), async snapshot => {
+            const state = snapshot.val();
+
+            if (!state) return;
+
+            hideAllSections();
+
+            if (state.phase === "choosingPrompt") {
+                if (state.promptChooser === username) {
+                    showPromptChooserCards();
+                } else {
+                    waitingSection.classList.remove("hidden");
+                    waitingSection.querySelector("h2").textContent =
+                        "Waiting for the prompt chooser...";
+                }
+            }
+
+            if (state.phase === "choosingResponses") {
+                if (state.promptChooser === username) {
+                    waitingSection.classList.remove("hidden");
+                    waitingSection.querySelector("h2").textContent =
+                        "Waiting for players to submit responses...";
+                } else {
+                    showResponseCards(state.prompt);
+                }
+            }
+
+            if (state.phase === "revealing") {
+                showRevealSequence(state.prompt);
+            }
+        });
+
+        function showPromptChooserCards() {
+            hideAllSections();
+            promptChooserSection.classList.remove("hidden");
+            promptCards.innerHTML = "";
+
+            const drawnPrompts = drawRandomCards(prompts, 4);
+
+            drawnPrompts.forEach(prompt => {
+                const card = document.createElement("button");
+                card.className = "card prompt-card";
+                card.textContent = prompt;
+
+                card.addEventListener("click", async () => {
+                    await update(ref(db, `${GAME_ID}/State`), {
+                        phase: "choosingResponses",
+                        prompt: prompt
+                    });
+                });
+
+                promptCards.appendChild(card);
+            });
+        }
+
+        function showResponseCards(prompt) {
+            hideAllSections();
+            responseChooserSection.classList.remove("hidden");
+
+            activePrompt.textContent = prompt;
+            responseCards.innerHTML = "";
+
+            const drawnResponses = drawRandomCards(responses, 4);
+
+            drawnResponses.forEach(response => {
+                const card = document.createElement("button");
+                card.className = "card response-card";
+                card.textContent = response;
+
+                card.addEventListener("click", async () => {
+                    await set(ref(db, `${GAME_ID}/Submissions/${username}`), {
+                        username: username,
+                        response: response
+                    });
+
+                    await update(ref(db, `${GAME_ID}/Players/${username}`), {
+                        ready: true
+                    });
+
+                    hideAllSections();
+                    waitingSection.classList.remove("hidden");
+                    waitingSection.querySelector("h2").textContent =
+                        "Response submitted. Waiting for others...";
+
+                    checkIfAllSubmitted();
+                });
+
+                responseCards.appendChild(card);
+            });
+        }
+
+        onValue(ref(db, `${GAME_ID}/Players`), () => {
+            checkIfAllSubmitted();
+        });
+
+        async function checkIfAllSubmitted() {
+            const stateSnapshot = await get(ref(db, `${GAME_ID}/State`));
+            const state = stateSnapshot.val();
+
+            if (!state || state.phase !== "choosingResponses") return;
+
+            const playersSnapshot = await get(ref(db, `${GAME_ID}/Players`));
+            const players = playersSnapshot.val() || {};
+
+            const responsePlayers = Object.values(players).filter(
+                player => player.role === "responseChooser"
+            );
+
+            if (responsePlayers.length === 0) return;
+
+            const allReady = responsePlayers.every(player => player.ready === true);
+
+            if (allReady) {
+                await update(ref(db, `${GAME_ID}/State`), {
+                    phase: "revealing"
+                });
+            }
+        }
+
+        async function showRevealSequence(prompt) {
+            hideAllSections();
+            revealSection.classList.remove("hidden");
+
+            const submissionsSnapshot = await get(ref(db, `${GAME_ID}/Submissions`));
+            const submissions = submissionsSnapshot.val() || {};
+            const submissionList = Object.values(submissions);
+
+            revealPrompt.textContent = prompt;
+            revealResponse.textContent = "";
+
+            for (const submission of submissionList) {
+                revealResponse.classList.remove("show");
+
+                await wait(700);
+
+                revealResponse.innerHTML = `
+      <p class="player-label">${submission.username}</p>
+      <p>${submission.response}</p>
+    `;
+
+                revealResponse.classList.add("show");
+
+                await wait(3000);
+            }
+
+            revealResponse.innerHTML = `
+    <p>All responses revealed.</p>
+    <p>The prompt chooser may now choose the winner in the next step.</p>
+  `;
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
 
     </script>
 
