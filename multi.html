@@ -274,6 +274,14 @@
 
         if (username) {
             showGameScreen();
+
+            set(ref(db, `${GAME_ID}/Players/${username}`), {
+                username,
+                ready: false,
+                score: 0,
+                vote: 0,
+                role: "waiting"
+            });
         }
 
         joinBtn.addEventListener("click", async () => {
@@ -509,7 +517,7 @@
           </div>
         `;
 
-                await wait(3000);
+                await wait(10000);
             }
 
             revealResponse.innerHTML = `
@@ -560,11 +568,21 @@
         }
 
         playAgainBtn.addEventListener("click", async () => {
+            const savedUsername = localStorage.getItem("username");
+
             await remove(ref(db, GAME_ID));
+
+            if (savedUsername) {
+                await set(ref(db, `${GAME_ID}/Players/${savedUsername}`), {
+                    username: savedUsername,
+                    ready: false,
+                    score: 0,
+                    vote: 0,
+                    role: "waiting"
+                });
+            }
+
             revealStarted = false;
-            localStorage.removeItem("username");
-            localStorage.removeItem("gameId");
-            location.reload();
         });
 
         function wait(ms) {
