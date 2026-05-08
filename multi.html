@@ -35,6 +35,7 @@
             border-radius: 24px;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35);
             backdrop-filter: blur(12px);
+            position: relative;
         }
 
         input {
@@ -134,6 +135,37 @@
             font-size: 26px;
             margin-top: 25px;
         }
+
+        .icon-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+
+            width: 42px;
+            height: 42px;
+
+            border-radius: 50%;
+            border: none;
+
+            background: rgba(255, 255, 255, 0.12);
+            color: white;
+
+            font-size: 22px;
+            font-weight: bold;
+
+            cursor: pointer;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            transition: 0.2s ease;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.22);
+            transform: scale(1.08);
+        }
     </style>
 </head>
 
@@ -149,6 +181,9 @@
 
     <div id="gameScreen" class="screen box hidden">
         <h2 id="playerDisplay"></h2>
+        <button id="exitBtn" class="icon-btn">
+            ✕
+        </button>
 
         <div id="chooserSection">
             <h2>Waiting for a prompt chooser</h2>
@@ -2170,6 +2205,7 @@
         const nameMessage = document.getElementById("nameMessage");
 
         const playerDisplay = document.getElementById("playerDisplay");
+        const exitBtn = document.getElementById("exitBtn");
         const chooserSection = document.getElementById("chooserSection");
         const promptSection = document.getElementById("promptSection");
         const responseSection = document.getElementById("responseSection");
@@ -2226,6 +2262,20 @@
             localStorage.setItem("gameId", GAME_ID);
 
             showGameScreen();
+        });
+
+        exitBtn.addEventListener("click", async () => {
+            const savedUsername = localStorage.getItem("username");
+
+            if (savedUsername) {
+                await remove(ref(db, `${GAME_ID}/Players/${savedUsername}`));
+                await remove(ref(db, `${GAME_ID}/Submissions/${savedUsername}`));
+            }
+
+            localStorage.removeItem("username");
+            localStorage.removeItem("gameId");
+
+            location.reload();
         });
 
         function showGameScreen() {
