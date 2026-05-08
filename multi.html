@@ -121,6 +121,7 @@
         const usernameInput = document.getElementById("usernameInput");
         const submitBtn = document.getElementById("submitBtn");
         const message = document.getElementById("message");
+        const GAME_ID = "Game1"; // Change this whenever needed
 
 
         // REGISTER PLAYER
@@ -136,24 +137,23 @@
 
             try {
 
-                await set(ref(db, "Players/" + username), {
+                await set(ref(db, `${GAME_ID}/Players/${username}`), {
                     username: username,
                     ready: false,
                     score: 0,
                     vote: 0
                 });
 
-                message.textContent =
-                    "Player registered successfully.";
+                localStorage.setItem("gameId", GAME_ID);
+                localStorage.setItem("username", username);
 
+                message.textContent = "Player registered successfully.";
                 usernameInput.value = "";
 
             } catch (error) {
 
                 console.error(error);
-
-                message.textContent =
-                    "Error while registering player.";
+                message.textContent = "Error while registering player.";
             }
 
         });
