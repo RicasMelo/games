@@ -277,10 +277,9 @@
         if (username) {
             showGameScreen();
 
-            set(ref(db, `${GAME_ID}/Players/${username}`), {
+            await update(ref(db, `${GAME_ID}/Players/${username}`), {
                 username,
                 ready: false,
-                score: 0,
                 vote: 0,
                 role: "waiting"
             });
@@ -296,7 +295,7 @@
 
             username = chosenName;
 
-            await set(ref(db, `${GAME_ID}/Players/${username}`), {
+            await update(ref(db, `${GAME_ID}/Players/${username}`), {
                 username,
                 ready: false,
                 score: 0,
@@ -463,6 +462,10 @@
                         ready: true
                     });
 
+                    responseSection.classList.add("hidden");
+                    waitingSection.classList.remove("hidden");
+                    waitingText.textContent = "Response submitted. Waiting for others...";
+
                     checkAllSubmitted();
                 });
 
@@ -595,33 +598,30 @@
 
         playAgainBtn.addEventListener("click", async () => {
             const playersSnap = await get(ref(db, `${GAME_ID}/Players`));
-            const oldPlayers = playersSnap.val() || {};
+            const players = playersSnap.val() || {};
 
-            const playerNames = Object.keys(oldPlayers);
+            const updates = {};
 
-            await remove(ref(db, GAME_ID));
-
-            for (const playerName of playerNames) {
-                const oldPlayer = oldPlayers[playerName];
-
-                await set(ref(db, `${GAME_ID}/Players/${playerName}`), {
-                    username: playerName,
-                    ready: false,
-                    score: oldPlayer.score || 0,
-                    vote: 0,
-                    role: "waiting"
-                });
+            for (const playerName in players) {
+                updates[`${GAME_ID}/Players/${playerName}/ready`] = false;
+                updates[`${GAME_ID}/Players/${playerName}/role`] = "waiting";
+                updates[`${GAME_ID}/Players/${playerName}/vote`] = 0;
             }
 
-            revealStarted = false;
-
-            await update(ref(db, `${GAME_ID}/State`), {
+            updates[`${GAME_ID}/State`] = {
                 phase: "waiting",
                 promptChooser: "",
                 prompt: "",
                 winner: "",
-                revealIndex: 0
-            });
+                revealIndex: 0,
+                revealTotal: 0
+            };
+
+            updates[`${GAME_ID}/Submissions`] = null;
+
+            await update(ref(db), updates);
+
+            revealStarted = false;
         });
 
         function wait(ms) {
