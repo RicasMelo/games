@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Short CAH Card Picker</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: #111827;
+      color: #f9fafb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .game {
+      width: 100%;
+      max-width: 900px;
+      background: #1f2937;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 2rem;
+    }
+
+    p {
+      color: #d1d5db;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .button-row {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+      margin-top: 25px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      background: #3b82f6;
+      color: white;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+
+    button:hover {
+      background: #2563eb;
+      transform: translateY(-2px);
+    }
+
+    button:disabled {
+      background: #6b7280;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 18px;
+      margin: 30px 0;
+    }
+
+    .card {
+      min-height: 180px;
+      background: #f9fafb;
+      color: #111827;
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.05rem;
+      cursor: pointer;
+      border: 4px solid transparent;
+      transition: transform 0.15s ease, border 0.15s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+    }
+
+    .card.selected {
+      border-color: #22c55e;
+      transform: scale(1.03);
+    }
+
+    .result-card {
+      margin: 25px auto;
+      max-width: 450px;
+      min-height: 160px;
+      background: #f9fafb;
+      color: #111827;
+      border-radius: 16px;
+      padding: 25px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <section id="deck-screen">
+      <h1>Card Picker Game</h1>
+      <p>Choose a deck. You will receive 4 random cards.</p>
+
+      <div class="button-row">
+        <button onclick="chooseDeck('prompts')">Prompts Deck</button>
+        <button onclick="chooseDeck('responses')">Responses Deck</button>
+      </div>
+    </section>
+
+    <section id="card-screen" class="hidden">
+      <h1 id="deck-title">Choose a Card</h1>
+      <p>Select one card, then confirm your choice.</p>
+
+      <div id="cards-container" class="cards"></div>
+
+      <div class="button-row">
+        <button id="confirm-button" onclick="confirmChoice()" disabled>Confirm Choice</button>
+        <button onclick="restartGame()">Restart</button>
+      </div>
+    </section>
+
+    <section id="result-screen" class="hidden">
+      <h1>Your Selected Card</h1>
+      <div id="result-card" class="result-card"></div>
+
+      <div class="button-row">
+        <button onclick="restartGame()">Restart Game</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const promptDeck = [
+      "Why can't I sleep at night?",
+      "What ended my last relationship?",
+      "What's that smell?",
+      "What is Batman's guilty pleasure?",
+      "What never fails to liven up the party?",
+      "What am I giving up for Lent?",
+      "What did I bring back from holiday?",
+      "What's my secret talent?"
+    ];
+
+    const responseDeck = [
+      "A suspicious amount of glitter.",
+      "An emotional support chicken.",
+      "A very questionable haircut.",
+      "The Wi-Fi password.",
+      "A dramatic entrance.",
+      "Too much confidence.",
+      "A tiny hat for a frog.",
+      "The power of friendship, unfortunately."
+    ];
+
+    let currentDeck = [];
+    let selectedCard = null;
+
+    const deckScreen = document.getElementById("deck-screen");
+    const cardScreen = document.getElementById("card-screen");
+    const resultScreen = document.getElementById("result-screen");
+    const cardsContainer = document.getElementById("cards-container");
+    const confirmButton = document.getElementById("confirm-button");
+    const deckTitle = document.getElementById("deck-title");
+    const resultCard = document.getElementById("result-card");
+
+    function chooseDeck(deckType) {
+      selectedCard = null;
+      confirmButton.disabled = true;
+
+      if (deckType === "prompts") {
+        currentDeck = promptDeck;
+        deckTitle.textContent = "Choose a Prompt Card";
+      } else {
+        currentDeck = responseDeck;
+        deckTitle.textContent = "Choose a Response Card";
+      }
+
+      const randomCards = getRandomCards(currentDeck, 4);
+      showCards(randomCards);
+
+      deckScreen.classList.add("hidden");
+      resultScreen.classList.add("hidden");
+      cardScreen.classList.remove("hidden");
+    }
+
+    function getRandomCards(deck, amount) {
+      const shuffled = [...deck].sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, amount);
+    }
+
+    function showCards(cards) {
+      cardsContainer.innerHTML = "";
+
+      cards.forEach(cardText => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.textContent = cardText;
+
+        card.addEventListener("click", () => {
+          document.querySelectorAll(".card").forEach(c => c.classList.remove("selected"));
+          card.classList.add("selected");
+          selectedCard = cardText;
+          confirmButton.disabled = false;
+        });
+
+        cardsContainer.appendChild(card);
+      });
+    }
+
+    function confirmChoice() {
+      if (!selectedCard) return;
+
+      resultCard.textContent = selectedCard;
+      cardScreen.classList.add("hidden");
+      resultScreen.classList.remove("hidden");
+    }
+
+    function restartGame() {
+      selectedCard = null;
+      currentDeck = [];
+      cardsContainer.innerHTML = "";
+      confirmButton.disabled = true;
+
+      cardScreen.classList.add("hidden");
+      resultScreen.classList.add("hidden");
+      deckScreen.classList.remove("hidden");
+    }
+  </script>
+</body>
+</html>
